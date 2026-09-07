@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Hidden Quest: 10,000 Levels</title>
+
+  <!-- Mobile App Web Capabilities -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="HiddenQuest">
+  <meta name="theme-color" content="#121214">
+
+  <!-- Icons & Manifest (consider replacing data: manifest with /manifest.json for PWAs) -->
+  <link rel="apple-touch-icon" href="https://img.icons8.com/emoji/192/magnifying-glass-tilted-left-emoji.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="https://img.icons8.com/emoji/192/magnifying-glass-tilted-left-emoji.png">
+  <link rel="manifest" href='data:application/json,{
+        "name": "Hidden Quest: Infinite",
+        "short_name": "HiddenQuest",
+        "start_url": "./",
+        "display": "standalone",
+        "background_color": "#121214",
+        "theme_color": "#121214",
+        "orientation": "portrait",
+        "icons": [{
+            "src": "https://img.icons8.com/emoji/192/magnifying-glass-tilted-left-emoji.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        }]
+    }'>
+
+  <style>
+    :root {
+      --bg-color: #121214;
+      --panel-bg: #1e1e24;
+      --accent-color: #ffd700;
+      --accent-hover: #ffae00;
+      --text-color: #f0f0f5;
+      --success-color: #4caf50;
+      --muted: #aaa;
+    }
+
+    * { box-sizing: border-box; user-select: none; margin: 0; padding: 0; touch-action: manipulation; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex; flex-direction: column; align-items: center;
+      min-height: 100vh; overflow-x: hidden; padding-bottom: 30px;
+    }
+
+    header {
+      width: 100%; background-color: var(--panel-bg);
+      padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 10;
+    }
+
+    h1 { color: var(--accent-color); font-size: 1.3rem; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+    .stats-bar { display: flex; gap: 8px; font-size: 0.85rem; font-weight: bold; }
+    .stat-box { background: rgba(255,255,255,0.05); padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
+
+    .game-container { display: flex; flex-direction: column; align-items: center; gap: 15px; padding: 15px; max-width: 1000px; width: 100%; }
+    .stage-wrapper { position: relative; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 25px rgba(0,0,0,0.7); border: 3px solid #333; touch-action: none; width: 100%; max-width: 800px; background: #000; }
+    canvas { display: block; width: 100%; height: auto; }
+
+    .key-container { width: 100%; background-color: var(--panel-bg); border-radius: 12px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+    .key-title { font-size: 0.95rem; margin-bottom: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; display:flex; justify-content:space-between; align-items:center; }
+    .item-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; }
+    .item-card {
+      background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 8px;
+      display: flex; flex-direction: column; align-items: center; gap: 4px; transition: all 0.3s ease; cursor: pointer; outline: none;
+    }
+    .item-card:focus { box-shadow: 0 0 0 3px rgba(255,215,0,0.16); transform: translateY(-2px); }
+    .item-card.found { background: rgba(76, 175, 80, 0.15); border-color: var(--success-color); opacity: 0.5; transform: scale(0.95); }
+    .item-card.found span { text-decoration: line-through; color: var(--success-color); }
+
+    .item-icon { font-size: 1.6rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+    .item-name { font-size: 0.75rem; font-weight: 600; text-align: center; }
+
+    .controls { display: flex; gap: 15px; width: 100%; justify-content: center; }
+    button {
+      background-color: var(--accent-color); color: #111; border: none; padding: 12px 20px; font-size: 0.95rem; font-weight: bold;
+      border-radius: 25px; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    button:active { transform: scale(0.96); }
+    button[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .floating-text { position: absolute; font-weight: bold; font-size: 1.5rem; pointer-events: none; animation: floatUp 0.8s ease-out forwards; z-index: 100; transform-origin: left center; white-space: nowrap; }
+    @keyframes floatUp { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-40px) scale(1.25); } }
+
+    .modal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.85); display:flex; justify-content:center; align-items:center; z-index:1000; opacity:0; pointer-events:none; transition: opacity 0.3s ease; }
+    .modal.active { opacity:1; pointer-events:auto; }
+    .modal-content { background: var(--panel-bg); padding:30px; border-radius:16px; text-align:center; max-width:350px; width:85%; border:2px solid var(--accent-color); box-shadow:0 10px 30px rgba(0,0,0,0.8); }
+    .modal-content h2 { font-size:1.8rem; color:var(--accent-color); margin-bottom:12px; }
+    .modal-content p { margin-bottom:20px; font-size:1rem; line-height:1.4; }
+
+    /* screen-reader only */
+    .sr-only { position: absolute !important; height: 1px; width: 1px; overflow: hidden; clip: rect(1px, 1px, 1px, 1px); white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🔍 Hidden Quest</h1>
+    <div class="stats-bar" aria-hidden="false">
+      <div class="stat-box">Pts: <span id="score">0</span></div>
+      <div class="stat-box">x<span id="combo">1</span></div>
+      <div class="stat-box"><span id="timer">00:00</span></div>
+    </div>
+  </header>
+
+  <div class="game-container">
+    <div class="stage-wrapper" id="stage-wrapper" aria-label="Game stage">
+      <canvas id="gameCanvas" width="800" height="500" role="img" aria-label="Hidden Quest canvas. Find the items listed below."></canvas>
+    </div>
+
+    <div class="key-container" aria-live="polite">
+      <div class="key-title">
+        <span>Targets (<span id="found-count">0</span>/<span id="total-count">0</span>)</span>
+        <span id="level-name" style="color: var(--accent-color);">Level 1</span>
+      </div>
+      <div class="item-list" id="item-list" role="list"></div>
+      <!-- Offscreen text alternative for screen readers -->
+      <ul id="sr-target-list" class="sr-only" aria-hidden="false"></ul>
+    </div>
+
+    <div class="controls">
+      <button id="hint-btn" aria-label="Show hint, costs 100 points">💡 Hint (-100)</button>
+      <button id="restart-btn" aria-label="Restart level">🔄 Restart</button>
+    </div>
+  </div>
+
+  <div class="modal" id="win-modal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-content">
+      <h2>Stage Clear! 🎉</h2>
+      <p id="modal-stats">You found all items!</p>
+      <button id="next-btn" aria-label="Next level">Next Level ➔</button>
+    </div>
+  </div>
+
+  <script>
+    // -------------------------
+    // Constants / Asset Pools
+    // -------------------------
+    const TARGET_ITEMS_POOL = [
+      { name: "Owl", emoji: "🦉" }, { name: "Red Apple", emoji: "🍎" }, { name: "Golden Key", emoji: "🔑" },
+      { name: "Frog", emoji: "🐸" }, { name: "Magic Gem", emoji: "💎" }, { name: "Butterfly", emoji: "🦋" },
+      { name: "Parrot", emoji: "🦜" }, { name: "Skull", emoji: "💀" }, { name: "Treasure Map", emoji: "🗺️" },
+      { name: "Gold Coin", emoji: "🪙" }, { name: "Compass", emoji: "🧭" }, { name: "Anchor", emoji: "⚓" },
+      { name: "Crown", emoji: "👑" }, { name: "Ring", emoji: "💍" }, { name: "Trophy", emoji: "🏆" },
+      { name: "Lantern", emoji: "🏮" }, { name: "Candle", emoji: "🕯️" }, { name: "Magic Wand", emoji: "🪄" },
+      { name: "Hourglass", emoji: "⏳" }, { name: "Crystal Ball", emoji: "🔮" }, { name: "Alien", emoji: "👽" },
+      { name: "Robot", emoji: "🤖" }, { name: "Rocket", emoji: "🚀" }, { name: "UFO", emoji: "🛸" },
+      { name: "Pizza", emoji: "🍕" }, { name: "Donut", emoji: "🍩" }, { name: "Guitar", emoji: "🎸" },
+      { name: "Microscope", emoji: "🔬" }, { name: "Telescope", emoji: "🔭" }, { name: "Magnet", emoji: "🧲" }
+    ];
+
+    const DECORATION_POOL = ["🌲", "🌳", "🌴", "🪨", "🍄", "🌿", "☁️", "⭐", "🌌", "🌊", "🧱", "🌵", "🌸", "🍂", "🪵", "🫧", "✨"];
+
+    const COLOR_THEMES = [
+      ['#1e3c72', '#2a5298', '#0f2027'],
+      ['#2c3e50', '#000000', '#1a2a3a'],
+      ['#130f40', '#30336b', '#192a56'],
+      ['#3b3b98', '#182c61', '#0c2461'],
+      ['#222f3e', '#10ac84', '#1e3799'],
+      ['#485460', '#1e272e', '#05c46b'],
+      ['#5f27cd', '#341f97', '#01a3a4']
+    ];
+
+    // GAME logical coordinate system (for level generation)
+    const GAME_WIDTH = 800;
+    const GAME_HEIGHT = 500;
+
+    // -------------------------
+    // Robust PRNG (mulberry32) + shuffle
+    // -------------------------
+    function mulberry32(seed) {
+      let t = seed >>> 0;
+      return function() {
+        t += 0x6D2B79F5;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function shuffle(array, rnd) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(rnd() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    // -------------------------
+    // Procedural Level Generator (positions normalized 0..1)
+    // -------------------------
+    function generateLevel(levelNum) {
+      // seed derived from level number (deterministic)
+      const seed = Math.floor(levelNum * 10007 + 1234567);
+      const rnd = mulberry32(seed);
+
+      const themeIndex = Math.floor(rnd() * COLOR_THEMES.length);
+      const bgGradient = COLOR_THEMES[themeIndex];
+
+      // item count: scale very slowly across many levels
+      const itemCount = Math.min(10, 4 + Math.floor(levelNum / 500));
+
+      // decorations (positions normalized)
+      const decorations = [];
+      const decorCount = 15 + Math.floor(rnd() * 15);
+      for (let i = 0; i < decorCount; i++) {
+        decorations.push({
+          emoji: DECORATION_POOL[Math.floor(rnd() * DECORATION_POOL.length)],
+          xNorm: 0.05 + rnd() * 0.9,
+          yNorm: 0.05 + rnd() * 0.9,
+          sizeNorm: 0.06 + rnd() * 0.12 // fraction of min dimension
+        });
+      }
+
+      // pick and shuffle items deterministically
+      const targetsCopy = TARGET_ITEMS_POOL.slice();
+      shuffle(targetsCopy, rnd);
+
+      const items = [];
+      const occupied = [];
+
+      for (let i = 0; i < itemCount; i++) {
+        const targetDef = targetsCopy[i % targetsCopy.length];
+        let xNorm, yNorm, valid = false, attempts = 0;
+        while (!valid && attempts < 200) {
+          xNorm = 0.075 + rnd() * 0.85;
+          yNorm = 0.075 + rnd() * 0.85;
+          valid = occupied.every(p => {
+            // distance in normalized space scaled by typical radius (~0.05)
+            const dx = p.x - xNorm, dy = p.y - yNorm;
+            return Math.hypot(dx, dy) > 0.08; // keep items apart
+          });
+          attempts++;
+        }
+        occupied.push({ x: xNorm, y: yNorm });
+
+        items.push({
+          id: `item_${levelNum}_${i}`,
+          name: targetDef.name,
+          emoji: targetDef.emoji,
+          xNorm,
+          yNorm,
+          radiusNorm: 0.028 + (rnd() * 0.02) // ~ proportional to min dimension
+        });
+      }
+
+      return { name: `Quest #${levelNum}`, bgGradient, decorations, items };
+    }
+
+    // -------------------------
+    // Game State
+    // -------------------------
+    let currentLevelIdx = 1;
+    let currentLevelData = null;
+    let score = 0;
+    let combo = 1;
+    let comboTimer = null;
+    let foundItems = new Set();
+    let startTime = 0;
+    let timerInterval = null;
+    let hintActive = null;
+
+    // -------------------------
+    // DOM refs
+    // -------------------------
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const stageWrapper = document.getElementById('stage-wrapper');
+    const itemListEl = document.getElementById('item-list');
+    const srTargetList = document.getElementById('sr-target-list');
+    const scoreEl = document.getElementById('score');
+    const comboEl = document.getElementById('combo');
+    const timerEl = document.getElementById('timer');
+    const foundCountEl = document.getElementById('found-count');
+    const totalCountEl = document.getElementById('total-count');
+    const levelNameEl = document.getElementById('level-name');
+    const winModal = document.getElementById('win-modal');
+    const hintBtn = document.getElementById('hint-btn');
+    const restartBtn = document.getElementById('restart-btn');
+
+    // -------------------------
+    // Shared AudioContext (resume on user gesture)
+    // -------------------------
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let audioResumed = false;
+    function ensureAudioResumed() {
+      if (!audioResumed && audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => { audioResumed = true; }).catch(()=>{});
+      }
+    }
+
+    function playSound(type) {
+      try {
+        ensureAudioResumed();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+
+        if (type === 'found') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, now);
+          osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
+          gain.gain.setValueAtTime(0.28, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+          osc.start(now); osc.stop(now + 0.22);
+        } else if (type === 'miss') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(180, now);
+          osc.frequency.exponentialRampToValueAtTime(110, now + 0.12);
+          gain.gain.setValueAtTime(0.18, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+          osc.start(now); osc.stop(now + 0.16);
+        } else if (type === 'win') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.linearRampToValueAtTime(554.37, now + 0.12);
+          osc.frequency.linearRampToValueAtTime(659.25, now + 0.24);
+          osc.frequency.linearRampToValueAtTime(880, now + 0.36);
+          gain.gain.setValueAtTime(0.28, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+          osc.start(now); osc.stop(now + 0.6);
+        }
+      } catch (e) {
+        // fail silently on browsers without audio support
+        // console.warn(e);
+      }
+    }
+
+    // Resume audio context on first user interaction
+    ['pointerdown', 'keydown', 'click', 'touchstart'].forEach(ev => {
+      window.addEventListener(ev, ensureAudioResumed, { once: true, passive: true });
+    });
+
+    // -------------------------
+    // Canvas + Resize handling (retina-safe, responsive)
+    // -------------------------
+    function resizeCanvasToDisplaySize() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const cssWidth = rect.width;
+      const cssHeight = rect.height;
+
+      canvas.width = Math.max(1, Math.round(cssWidth * dpr));
+      canvas.height = Math.max(1, Math.round(cssHeight * dpr));
+      canvas.style.width = cssWidth + 'px';
+      canvas.style.height = cssHeight + 'px';
+
+      // set drawing transform so we can draw in CSS pixels
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    // compute logical draw sizes (CSS pixels)
+    function getLogicalSize() {
+      const rect = canvas.getBoundingClientRect();
+      return { w: rect.width, h: rect.height, dpr: window.devicePixelRatio || 1 };
+    }
+
+    window.addEventListener('resize', () => { resizeCanvasToDisplaySize(); drawStage(); });
+
+    // -------------------------
+    // Rendering pipeline
+    // -------------------------
+    function drawStage() {
+      if (!currentLevelData) return;
+      resizeCanvasToDisplaySize();
+      const { w: logicalW, h: logicalH, dpr } = getLogicalSize();
+      const minDim = Math.min(logicalW, logicalH);
+
+      // gradient over logical pixels (use logical height)
+      const grad = ctx.createLinearGradient(0, 0, 0, logicalH);
+      const g = currentLevelData.bgGradient;
+      grad.addColorStop(0, g[0]);
+      grad.addColorStop(0.5, g[1]);
+      grad.addColorStop(1, g[2]);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, logicalW, logicalH);
+
+      // draw decorations
+      currentLevelData.decorations.forEach(dec => {
+        ctx.save();
+        const fontSize = Math.round(dec.sizeNorm * minDim);
+        ctx.font = `${fontSize}px sans-serif`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        const x = dec.xNorm * logicalW;
+        const y = dec.yNorm * logicalH;
+        ctx.fillText(dec.emoji, x, y);
+        ctx.restore();
+      });
+
+      // draw items
+      currentLevelData.items.forEach(item => {
+        ctx.save();
+        const fontSize = Math.round(item.radiusNorm * minDim * 1.8);
+        ctx.font = `${fontSize}px sans-serif`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+
+        const x = item.xNorm * logicalW;
+        const y = item.yNorm * logicalH;
+        const radiusPx = Math.round(item.radiusNorm * minDim);
+
+        if (foundItems.has(item.id)) {
+          ctx.beginPath();
+          ctx.arc(x, y, radiusPx, 0, Math.PI * 2);
+          ctx.strokeStyle = '#4caf50';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+          ctx.globalAlpha = 0.4;
+        }
+        ctx.fillText(item.emoji, x, y);
+        ctx.restore();
+
+        if (hintActive === item.id) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(x, y, radiusPx + 15, 0, Math.PI * 2);
+          ctx.strokeStyle = '#ffd700';
+          ctx.lineWidth = 4;
+          ctx.setLineDash([6, 6]);
+          ctx.stroke();
+          ctx.restore();
+        }
+      });
+    }
+
+    // -------------------------
+    // UI: Key rendering + accessibility
+    // -------------------------
+    function renderKey() {
+      const level = currentLevelData;
+      itemListEl.innerHTML = '';
+      srTargetList.innerHTML = '';
+
+      level.items.forEach((item, idx) => {
+        const card = document.createElement('div');
+        card.className = `item-card ${foundItems.has(item.id) ? 'found' : ''}`;
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
+        card.dataset.id = item.id;
+        card.innerHTML = `
+          <div class="item-icon">${item.emoji}</div>
+          <div class="item-name">${item.name}</div>
+        `;
+
+        card.addEventListener('click', () => {
+          // focusing the item shows a hint target
+          hintActive = item.id;
+          drawStage();
+          setTimeout(() => { hintActive = null; drawStage(); }, 1400);
+        });
+
+        card.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            ev.preventDefault();
+            card.click();
+          }
+        });
+
+        itemListEl.appendChild(card);
+
+        // add readable list item for screen readers
+        const li = document.createElement('li');
+        li.textContent = `${idx+1}. ${item.name}`;
+        srTargetList.appendChild(li);
+      });
+    }
+
+    // -------------------------
+    // Input handling (pointer events)
+    // -------------------------
+    function handleTap(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      const logicalX = (clientX - rect.left);
+      const logicalY = (clientY - rect.top);
+      const { w: logicalW, h: logicalH } = getLogicalSize();
+
+      let hit = false;
+      currentLevelData.items.forEach(item => {
+        if (foundItems.has(item.id)) return;
+        const x = item.xNorm * logicalW;
+        const y = item.yNorm * logicalH;
+        const radiusPx = Math.round(item.radiusNorm * Math.min(logicalW, logicalH));
+        const dist = Math.hypot(logicalX - x, logicalY - y);
+        if (dist <= radiusPx) {
+          hit = true;
+          onItemFound(item, clientX, clientY);
+        }
+      });
+
+      if (!hit) onMiss(clientX, clientY);
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      // prevent multi-touch default behavior
+      e.preventDefault();
+      ensureAudioResumed();
+      handleTap(e.clientX, e.clientY);
+    });
+
+    // Also allow keyboard "space" to act as a miss (or future focused interactions)
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        // dismiss modals
+        winModal.classList.remove('active');
+      }
+    });
+
+    // -------------------------
+    // Feedback (found/miss/combo)
+    // -------------------------
+    function onItemFound(item, clientX, clientY) {
+      if (foundItems.has(item.id)) return;
+      foundItems.add(item.id);
+      playSound('found');
+
+      if (hintActive === item.id) hintActive = null;
+
+      const basePoints = 200;
+      const earnedPoints = basePoints * combo;
+      score += earnedPoints;
+      scoreEl.textContent = score;
+
+      combo++;
+      comboEl.textContent = combo;
+      resetComboTimer();
+
+      showFloatingText(`+${earnedPoints}`, clientX, clientY, '#4caf50');
+
+      foundCountEl.textContent = foundItems.size;
+      renderKey();
+      drawStage();
+      saveProgress();
+
+      if (foundItems.size === currentLevelData.items.length) {
+        setTimeout(onLevelComplete, 450);
+      }
+    }
+
+    function onMiss(clientX, clientY) {
+      playSound('miss');
+      combo = 1;
+      comboEl.textContent = combo;
+      score = Math.max(0, score - 20);
+      scoreEl.textContent = score;
+      showFloatingText('-20', clientX, clientY, '#e53935');
+      saveProgress();
+    }
+
+    function resetComboTimer() {
+      clearTimeout(comboTimer);
+      comboTimer = setTimeout(() => { combo = 1; comboEl.textContent = combo; }, 3500);
+    }
+
+    function showFloatingText(text, clientX, clientY, color) {
+      // position relative to stage wrapper so it aligns with canvas
+      const rect = stageWrapper.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+
+      const el = document.createElement('div');
+      el.className = 'floating-text';
+      el.textContent = text;
+      el.style.color = color;
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+      stageWrapper.appendChild(el);
+      setTimeout(() => {
+        if (el && el.parentNode) el.remove();
+      }, 900);
+    }
+
+    // -------------------------
+    // Hint logic (gated by score)
+    // -------------------------
+    hintBtn.addEventListener('click', () => {
+      if (!currentLevelData) return;
+      const remaining = currentLevelData.items.filter(i => !foundItems.has(i.id));
+      if (remaining.length === 0) return;
+
+      if (score < 100) {
+        // optionally show a small flash or sound
+        playSound('miss');
+        hintBtn.setAttribute('aria-disabled', 'true');
+        setTimeout(() => hintBtn.removeAttribute('aria-disabled'), 700);
+        return;
+      }
+
+      // deduct
+      score = Math.max(0, score - 100);
+      scoreEl.textContent = score;
+      saveProgress();
+
+      // show a random remaining item as hint
+      const rnd = mulberry32(Date.now() % 2147483647);
+      const randomItem = remaining[Math.floor(rnd() * remaining.length)];
+      hintActive = randomItem.id;
+      drawStage();
+      setTimeout(() => {
+        if (hintActive === randomItem.id) { hintActive = null; drawStage(); }
+      }, 2500);
+    });
+
+    // Restart
+    restartBtn.addEventListener('click', () => { initLevel(currentLevelIdx); });
+
+    // Level complete modal
+    function onLevelComplete() {
+      clearInterval(timerInterval);
+      playSound('win');
+      const timeTaken = timerEl.textContent;
+      document.getElementById('modal-stats').innerHTML =
+        `Level ${currentLevelIdx} Cleared in <b>${timeTaken}</b>!<br>Total Score: <b>${score} pts</b>`;
+      winModal.classList.add('active');
+      winModal.setAttribute('aria-hidden', 'false');
+      saveProgress();
+    }
+
+    document.getElementById('next-btn').addEventListener('click', () => {
+      winModal.classList.remove('active');
+      winModal.setAttribute('aria-hidden', 'true');
+      initLevel(currentLevelIdx + 1);
+    });
+
+    // -------------------------
+    // Timer
+    // -------------------------
+    function startTimer() {
+      clearInterval(timerInterval);
+      startTime = Date.now();
+      timerInterval = setInterval(() => {
+        const elapsedSecs = Math.floor((Date.now() - startTime) / 1000);
+        const mins = String(Math.floor(elapsedSecs / 60)).padStart(2, '0');
+        const secs = String(elapsedSecs % 60).padStart(2, '0');
+        timerEl.textContent = `${mins}:${secs}`;
+      }, 1000);
+    }
+
+    // -------------------------
+    // Persistence (localStorage)
+    // -------------------------
+    function saveProgress() {
+      try {
+        const data = { score, level: currentLevelIdx, found: Array.from(foundItems) };
+        localStorage.setItem('hq_progress', JSON.stringify(data));
+      } catch (e) {}
+    }
+
+    function loadProgress() {
+      try {
+        const raw = localStorage.getItem('hq_progress');
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (typeof data.score === 'number') score = data.score;
+        if (typeof data.level === 'number' && data.level >= 1) currentLevelIdx = data.level;
+      } catch (e) {}
+    }
+
+    // -------------------------
+    // Initialization & Level Loader
+    // -------------------------
+    function initLevel(levelNum) {
+      currentLevelIdx = Math.max(1, Math.min(10000, levelNum));
+      currentLevelData = generateLevel(currentLevelIdx);
+
+      foundItems = new Set();
+      hintActive = null;
+
+      levelNameEl.textContent = `Level ${currentLevelIdx}`;
+      foundCountEl.textContent = "0";
+      totalCountEl.textContent = currentLevelData.items.length;
+
+      // load score if present
+      scoreEl.textContent = score;
+      combo = 1;
+      comboEl.textContent = combo;
+
+      // ensure canvas sizing and initial draw
+      resizeCanvasToDisplaySize();
+      startTimer();
+      renderKey();
+      drawStage();
+      saveProgress();
+    }
+
+    // Load progress if present
+    loadProgress();
+    // Initialize level (use loaded currentLevelIdx)
+    initLevel(currentLevelIdx);
+
+    // Save progress on unload
+    window.addEventListener('beforeunload', saveProgress);
+
+    // Expose a quick debug helper (console)
+    window.__hq = { initLevel, drawStage, generateLevel };
+  </script>
+</body>
+</html>

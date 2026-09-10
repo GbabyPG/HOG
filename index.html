@@ -43,3 +43,183 @@
     <script src="game.js"></script>
 </body>
 </html>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Georgia', serif; }
+body { background: #0d0a08; color: #f0e6d2; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+
+#game-container { display: flex; background: #1a1410; border: 4px solid #4a3828; border-radius: 8px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+#canvas-wrapper { position: relative; width: 960px; height: 540px; }
+canvas { display: block; cursor: crosshair; }
+
+#sidebar { width: 280px; padding: 20px; background: #241b14; border-left: 2px solid #4a3828; display: flex; flex-direction: column; gap: 20px; }
+.header h2 { color: #d4a359; font-size: 1.4rem; }
+.header h3 { color: #a68a68; font-size: 1rem; font-style: italic; }
+
+.stats { display: flex; justify-content: space-between; background: #120e0a; padding: 10px; border-radius: 4px; font-weight: bold; color: #d4a359; }
+
+#item-list { list-style: none; margin-top: 10px; }
+#item-list li { padding: 6px 0; border-bottom: 1px solid #36281c; color: #c4b59d; }
+#item-list li.found { color: #556b2f; text-decoration: line-through; opacity: 0.6; }
+
+button { padding: 10px 15px; background: #6b2d18; color: #f0e6d2; border: 1px solid #9c4528; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; }
+button:hover { background: #85381e; }
+
+#overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; }
+#overlay.hidden { display: none; }
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Game State
+let score = 0;
+let hintsRemaining = 2;
+let timeLeft = 180; // 3 minutes
+let timerInterval;
+
+// Target Items (Coordinates based on 960x540 canvas resolution)
+const items = [
+    { id: 1, name: "Gilded Compass", x: 620, y: 110, radius: 25, found: false },
+    { id: 2, name: "Brass Telescope", x: 440, y: 280, radius: 30, found: false },
+    { id: 3, name: "Moon Pendant", x: 530, y: 195, radius: 20, found: false },
+    { id: 4, name: "Metal Key", x: 210, y: 410, radius: 20, found: false },
+    { id: 5, name: "Small Potion", x: 165, y: 425, radius: 22, found: false }
+];
+
+// Draw canvas scene with procedural placeholder artwork
+function drawScene() {
+    // Background Room
+    ctx.fillStyle = "#2b1e16";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Arch Window
+    ctx.fillStyle = "#111a2e";
+    ctx.beginPath();
+    ctx.arc(200, 180, 80, Math.PI, 0);
+    ctx.rect(120, 180, 160, 120);
+    ctx.fill();
+
+    // Fireplace glow
+    let grad = ctx.createRadialGradient(720, 380, 10, 720, 380, 120);
+    grad.addColorStop(0, '#ff9900');
+    grad.addColorStop(1, 'rgba(43, 30, 22, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(580, 260, 280, 240);
+
+    // Render items
+    items.forEach(item => {
+        if (!item.found) {
+            ctx.fillStyle = "#8a6d4b"; // Blend item into scene
+            ctx.beginPath();
+            ctx.arc(item.x, item.y, 12, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            // Draw highlight ring when found
+            ctx.strokeStyle = "#00ffcc";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(item.x, item.y, item.radius, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+    });
+}
+
+// Click detection
+canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    let hit = false;
+    items.forEach(item => {
+        if (!item.found) {
+            const dist = Math.hypot(clickX - item.x, clickY - item.y);
+            if (dist < item.radius) {
+                item.found = true;
+                score += 250;
+                hit = true;
+            }
+        }
+    });
+
+    if (!hit) score = Math.max(0, score - 20); // Penalty for wrong clicks
+    updateUI();
+    drawScene();
+    checkWinCondition();
+});
+
+function useHint() {
+    if (hintsRemaining <= 0) return;
+    const unfound = items.find(i => !i.found);
+    if (unfound) {
+        hintsRemaining--;
+        // Flash target area briefly
+        ctx.strokeStyle = "#ff0000";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(unfound.x, unfound.y, unfound.radius + 10, 0, Math.PI * 2);
+        ctx.stroke();
+        document.getElementById('hint-count').innerText = hintsRemaining;
+    }
+}
+
+function updateUI() {
+    document.getElementById('score').innerText = score;
+    const list = document.getElementById('item-list');
+    list.innerHTML = '';
+    
+    let foundCount = 0;
+    items.forEach(item => {
+        const li = document.createElement('li');
+        li.innerText = item.name;
+        if (item.found) {
+            li.classList.add('found');
+            foundCount++;
+        }
+        list.appendChild(li);
+    });
+    
+    document.getElementById('found-count').innerText = foundCount;
+}
+
+function startTimer() {
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        const mins = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+        const secs = String(timeLeft % 60).padStart(2, '0');
+        document.getElementById('timer').innerText = `${mins}:${secs}`;
+
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            showEndScreen("Time's Up!", "You ran out of time.");
+        }
+    }, 1000);
+}
+
+function checkWinCondition() {
+    if (items.every(i => i.found)) {
+        clearInterval(timerInterval);
+        showEndScreen("Level Cleared!", `Final Score: ${score}`);
+    }
+}
+
+function showEndScreen(title, desc) {
+    document.getElementById('overlay-title').innerText = title;
+    document.getElementById('overlay-desc').innerText = desc;
+    document.getElementById('overlay').classList.remove('hidden');
+}
+
+function restartLevel() {
+    score = 0;
+    timeLeft = 180;
+    hintsRemaining = 2;
+    items.forEach(i => i.found = false);
+    document.getElementById('overlay').classList.add('hidden');
+    document.getElementById('hint-count').innerText = hintsRemaining;
+    updateUI();
+    drawScene();
+    clearInterval(timerInterval);
+    startTimer();
+}
+
+// Initial setup
+updateUI();
+drawScene();
+startTimer();
